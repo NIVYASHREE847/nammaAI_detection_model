@@ -1,0 +1,73 @@
+# SafeCross configuration
+# All thresholds and geometry live here so the pipeline needs no code edits.
+
+model:
+  # Exported ExecuTorch programs (produced by export/export_model.py)
+  fp32_pte: models/ssdlite320_fp32.pte
+  int8_pte: models/ssdlite320_int8.pte
+  # Static metadata written next to the .pte files at export time
+  meta: models/model_meta.json
+  anchors: models/anchors.npy
+
+detection:
+  score_threshold: 0.5      # min class probability to keep a box
+  nms_iou: 0.45             # per-class NMS IoU threshold
+  topk_candidates: 300      # torchvision SSD default: per-class candidates before NMS
+  detections_per_img: 300   # torchvision SSD default: max detections after NMS
+  # Classes we report. Names are COCO names; ids are resolved from model_meta.json.
+  classes: [person, bicycle, car, motorcycle, bus, truck]
+  # One physical vehicle cannot be a car AND a truck. torchvision runs NMS per
+  # class, so the same object can survive twice under two vehicle labels, which
+  # double-counts vehicle_total. This extra class-agnostic pass over the vehicle
+  # classes removes those duplicates. Set false to get raw torchvision behaviour.
+  merge_duplicate_vehicles: true
+  cross_class_iou: 0.6
+
+  # Which of the above roll up into vehicle_total.
+  # Bicycle counts as a vehicle: at a crossing it is a moving conflict party, not a pedestrian.
+  vehicle_classes: [bicycle, car, motorcycle, bus, truck]
+
+zone:
+  enabled: true
+  # Region of interest, normalized to [0,1] of frame width/height so the same
+  # polygon works at any resolution. Order matters (polygon vertices in sequence).
+  # Default: the crosswalk band itself, tuned for data/test_video.mp4. It is
+  # deliberately tight. An earlier version covered the whole carriageway
+  # (y 0.33-0.99); that made vehicles_in_zone >= 3 true in 99% of frames, so the
+  # vehicle half of the conflict rule carried no information and the flag fired
+  # on 87% of frames. The zone must contain the place where the two parties'
+  # paths actually cross, not all the road in view.
+  # Re-draw this for your own footage -- it is scene geometry, not a constant.
+  polygon_norm:
+    - [0.05, 0.47]
+    - [0.95, 0.47]
+    - [0.95, 0.66]
+    - [0.05, 0.66]
+  # Which point of a detection box must lie inside the polygon.
+  # bottom_center = the object's ground contact point (best for a ground-plane ROI).
+  anchor_point: bottom_center
+
+conflict:
+  # conflict_flag is raised once
+  #   persons_in_zone >= min_persons AND vehicles_in_zone >= min_vehicles
+  # has held for min_consecutive_frames PROCESSED frames in a row, and stays
+  # raised while it keeps holding. The duration term counts processed frames,
+  # so it scales with --stride: at stride 1 and 30 fps, 5 frames is 0.17 s.
+  min_persons: 2
+  min_vehicles: 1
+  min_consecutive_frames: 5
+
+pipeline:
+  stride: 1                 # process every Nth frame
+  tile: false               # 2x2 tiled inference + merge NMS (helps small/distant people)
+  tile_grid: [2, 2]
+  tile_overlap: 0.15        # fraction of tile size overlapped between neighbours
+  tile_include_full_frame: true   # also run the whole frame and merge, so large objects survive
+  save_annotated_frames: true
+  save_detections: true     # outputs/detections.jsonl, for offline zone/threshold tuning
+  annotated_video: true
+  annotated_video_fps: 0    # 0 = use source fps / stride
+  n_samples: 3              # how many "best" sample frames to copy into outputs/samples
+
+output:
+  dir: outputs

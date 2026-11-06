@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Build artefacts and run outputs: regenerate with
+#   python export/export_model.py && python scripts/run_pipeline.py
+models/
+outputs/
+outputs_*/

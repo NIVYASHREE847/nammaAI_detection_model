@@ -1,0 +1,21 @@
+# SafeCross pinned dependency set (CPU only, no CUDA).
+#
+# torch/torchvision must be installed from the PyTorch CPU index, otherwise pip
+# pulls the CUDA build:
+#   pip install torch==2.14.0 torchvision==0.29.0 --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt
+#
+# Why these exact versions:
+#   torchvision 0.29.0 hard-pins torch==2.14.0 (C-extension ABI match).
+#   executorch 1.5.1 works against torch 2.14 and ships win_amd64 / manylinux
+#   x86_64 / manylinux aarch64 (Raspberry Pi 64-bit) wheels for cp312.
+#   executorch 1.6.0 forces torch==2.15.0, for which no torchvision wheel
+#   exists yet -- that combination breaks `import torchvision`.
+torch==2.14.0
+torchvision==0.29.0
+executorch==1.5.1
+numpy>=2.0,<3
+opencv-python==4.12.0.88
+PyYAML==6.0.3
+psutil==7.1.3
+pytest==9.0.1
